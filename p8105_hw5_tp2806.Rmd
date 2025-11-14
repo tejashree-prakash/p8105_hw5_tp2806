@@ -46,3 +46,73 @@ bday_results <-
 ```
 
 
+### Visualize the probabilities  
+
+```{r}
+#Summary table
+bday_results %>%
+  slice_head(n = 5) %>% #just first 5 rows 
+  knitr::kable(
+    digits = 4,
+    caption = "Estimated probability that at least two people in a group will share a birthday"
+  )
+
+
+#Produce probability plot 
+bday_results %>%
+  ggplot(aes(x = group_size, y = repeat_probability)) + 
+  geom_point() + 
+  geom_line() +
+  labs(
+    x = "Group Size (N)",
+    y = "Estimated probability of a shared birthday",
+    title = "Estimated probability that at least two people in a group share a birthday"
+  )
+```
+
+After producing a dataframe in which there is a birthday simulation ran 10000 times for each group size from 2 to 50, there is a strong positive trend between group size and estimated probability of sharing a birthday with at least one other person within one group. Essentially, as group size increases this estimated probability increases. 
+
+
+
+# Problem 2: One-Sample T-Test Simulation 
+
+### Creating function 
+
+```{r}
+ttest_simulation <- function(mu, n = 30, sigma = 5) { #fixing n and sigma
+  x = rnorm(n, mean = mu, sd = sigma)
+  test_stat = t.test(x, mu = 0) #set mu to 0, produce test statistic
+  broom::tidy(test_stat) %>%
+    select(estimate, p.value) %>%
+    rename(
+      mu_hat = estimate,
+      p_value = p.value
+    )
+}
+```
+
+### Running the simulation 
+
+```{r}
+ttest_results <- 
+  expand.grid(
+    true_mu = 1:6,
+    iter = 1:1000 #iterate t test 1000 times per true_mu 
+  ) %>%
+  mutate(
+    sim = map(true_mu, ttest_simulation)
+  ) %>%
+  unnest(sim) %>%
+  mutate(
+    reject = p_value < 0.05 #only want significant results 
+  )
+
+ttest_results %>%
+  group_by(true_mu) %>% 
+  slice_head(n = 3) %>% #only show first 3 iterations of each mu           
+  knitr::kable(
+    digits = 3,
+    caption = "T-Test Simulation Results with Estimates"
+  )
+```
+
