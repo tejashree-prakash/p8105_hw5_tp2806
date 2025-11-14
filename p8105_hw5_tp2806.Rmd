@@ -14,7 +14,7 @@ set.seed(1)
 
 # Problem 1: Birthday Simulation
 
-### Creating birthday function
+#### Creating birthday function
 
 ```{r}
 bday_simulation <- function(ngroup) {
@@ -28,7 +28,7 @@ bday_simulation(10)
 ```
 
 
-### Run the function 10000 times and compute probabilities 
+#### Run the function 10000 times and compute probabilities 
 
 ```{r}
 bday_results <-
@@ -46,7 +46,7 @@ bday_results <-
 ```
 
 
-### Visualize the probabilities  
+#### Visualize the probabilities  
 
 ```{r}
 #Summary table
@@ -70,18 +70,18 @@ bday_results %>%
   )
 ```
 
-After producing a dataframe in which there is a birthday simulation ran 10000 times for each group size from 2 to 50, there is a strong positive trend between group size and estimated probability of sharing a birthday with at least one other person within one group. Essentially, as group size increases this estimated probability increases. 
+After producing a dataframe in which there is a birthday simulation ran 10000 times for each group size from 2 to 50, there is a strong positive trend between group size and estimated probability of sharing a birthday with at least one other person within one group. Essentially, as group size increases this estimated probability of sharing a birthday with at least one other person increases. 
 
 
 
 # Problem 2: One-Sample T-Test Simulation 
 
-### Creating function 
+#### Creating function 
 
 ```{r}
 ttest_simulation <- function(mu, n = 30, sigma = 5) { #fixing n and sigma
   x = rnorm(n, mean = mu, sd = sigma)
-  test_stat = t.test(x, mu = 0) #set mu to 0, produce test statistic
+  test_stat = t.test(x, mu = 0) #set mu to 0 (null hypothesis), produce mu_hat (estimate) and p-value 
   broom::tidy(test_stat) %>%
     select(estimate, p.value) %>%
     rename(
@@ -91,16 +91,16 @@ ttest_simulation <- function(mu, n = 30, sigma = 5) { #fixing n and sigma
 }
 ```
 
-### Running the simulation 
+#### Running the simulation - comparing true_mu against hypothesis testing. 
 
 ```{r}
 ttest_results <- 
   expand.grid(
-    true_mu = 1:6,
-    iter = 1:1000 #iterate t test 1000 times per true_mu 
+    mu_true = 1:6, 
+    iter = 1:1000 #iterate t test 1000 times per mu_true 
   ) %>%
   mutate(
-    sim = map(true_mu, ttest_simulation)
+    sim = map(mu_true, ttest_simulation)
   ) %>%
   unnest(sim) %>%
   mutate(
@@ -108,11 +108,71 @@ ttest_results <-
   )
 
 ttest_results %>%
-  group_by(true_mu) %>% 
+  group_by(mu_true) %>% 
   slice_head(n = 3) %>% #only show first 3 iterations of each mu           
   knitr::kable(
     digits = 3,
     caption = "T-Test Simulation Results with Estimates"
   )
 ```
+This table demonstrates 3 of the 1000 simulation iterations per true mu value. Each true mu value is compared with a hypothesis testing population estimate of mu, its p-value, and whether the null hypothesis was rejected or not (indicating significance). 
+
+
+#### Visualizing Power and Estimated Mu vs True Mu 
+
+```{r}
+power <- ttest_results %>%
+  group_by(mu_true) %>%
+  summarise(
+    power = mean(reject)
+  )
+
+power %>%
+  ggplot(aes(x = mu_true, y = power)) + 
+  geom_point() + 
+  geom_line() + 
+  labs(
+    x="True Mean Value",
+    y="Power",
+    title = "Power of One-Sample T Test Compared to True Mean"
+  )
+```
+<br> The power of a test is the probability of rejecting the null when it should be rejected. The plot above demonstrates that a larger true mean value leads to a greater power. As the true mean moves further from 0, there is a larger effect size. Therefore, a larger effect size leads to increase in power. 
+
+
+```{r}
+#Get average of mu_hat grouping by mu_true 
+mean_df <- ttest_results %>%
+  group_by(mu_true) %>%
+  summarise(means = mean(mu_hat), .groups = "drop")
+
+#Get average of mu_hat only when null hypothesis is rejected
+mean_reject_df <- ttest_results %>%
+  filter(reject == TRUE) %>% 
+  group_by(mu_true) %>%
+  summarise(mean_reject = mean(mu_hat), .groups = "drop")
+
+#Combine dfs
+mean_results <- left_join(mean_df, mean_reject_df, by = "mu_true")
+
+#Produce plot to visualize average estimate of mu_hat when comparing mu_hat and mu_true
+ggplot(mean_results, aes(x = mu_true)) +
+  geom_line(aes(y = means, color = "All samples"), linewidth = 1) +
+  geom_point(aes(y = means, color = "All samples"), size = 2) +
+
+  geom_line(aes(y = mean_reject, color = "Rejected H0"), linewidth = 1) +
+  geom_point(aes(y = mean_reject, color = "Rejected H0"), size = 2) +
+
+  labs(
+    title = "Mean Estimated Mu Across Simulations",
+    x = "True Mu",
+    y = "Average Mu_hat"
+  ) +
+  scale_color_manual(values = c("All samples" = "black",
+                                "Rejected H0" = "red"),
+                     name = "") +
+  theme_minimal() 
+```
+<br> This plot demonstrates how the true mean value (true mu) relates to the average estimated mean value obtained across the simulation, comparing all samples to only those with the null hypothesis rejected. Overall, the average mean value equals the true mean value across all samples. However, they were not equal among the rejected null samples when the mean values were lower in magnitude. This demonstrates a form of bias where the estimated and true mean values only equal one another when the means are relatively greater in magnitude. 
+
 
