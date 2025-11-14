@@ -118,7 +118,7 @@ ttest_results %>%
 This table demonstrates 3 of the 5000 simulation iterations per true mu value. Each true mu value is compared with a hypothesis testing population estimate of mu, its p-value, and whether the null hypothesis was rejected or not (indicating significance). 
 
 
-#### Visualizing Power and Estimated Mu vs True Mu 
+#### Visualizing power and estimated mu vs true mu 
 
 ```{r}
 power <- ttest_results %>%
@@ -187,21 +187,22 @@ homicide_df <- read_csv("data/homicide-data.csv")
 
 #Add city_state variable 
 homicide_df <- homicide_df %>%
-  mutate(city_state = str_c(city, ", ", state)) 
+  mutate(city_state = str_c(city, ", ", state))
 
-knitr::kable(head(homicide_df, 5))
+head(homicide_df, 5)
 ```
 
 This dataset contains information on homicides in 50 large U.S. cities, as shown in the city_state variable. Each row is a single homicide case. 
 
-<br> Key variables include: 
-* uid - homicide case identification 
-* reported_date - date the case was initially reported
-* victim_last; victim_first; victim_race; victim_age; victim_sex describe the demographic information about the victim of the homicide case
-* disposition - states the case status (closed without arrest, closed by arrest, open/no arrest)
+Key variables include:
+
+* uid — homicide case identification
+* reported_date — date the case was initially reported
+* victim_last; victim_first; victim_race; victim_age; victim_sex — demographic info for the victim
+* disposition — case status (closed without arrest, closed by arrest, open/no arrest)
 
 
-#### Summarizing total number of homicides and unsolved homicdies by city
+#### Summarizing total number of homicides and unsolved homicides by city
 
 ```{r}
 homicide_summary <- 
@@ -211,9 +212,12 @@ homicide_summary <-
     total_homicides = n(), 
     unsolved_homicides = sum(disposition %in% c("Closed without arrest", "Open/No arrest")) #sum the two unsolved categories together
   ) %>%
-  arrange(desc(total_homicides))
+  arrange(desc(total_homicides)) 
 
-knitr::kable(head(homicide_summary, 15))
+homicide_summary %>%
+  knitr::kable(
+    caption = "Total Homicides and Unsolved Homicides for 50 Major US Cities"
+  )
 ```
 As seen in this table, Chicago has the greatest number of total homicides and unsolved homicides. Baltimore has the next greatest number of total unsolved homicides, although it is only the fourth highest total homicide count. 
 
@@ -235,14 +239,16 @@ baltimore_test <-
 baltimore_test=
   baltimore_test %>% 
   broom::tidy() %>%
-  select(estimate, conf.low, conf.high, p.value) %>%
+  select(estimate, conf.low, conf.high, p.value)
+
+baltimore_test %>%
   knitr::kable(
     caption = "Proportion and Confidence Intervals of Unsolved Homicides in Baltimore, MD",
     digits = 4
   )
 ```
 
-#### Prop.Test for All Cities
+#### Prop.Test for all cities
 
 ```{r}
 #Run proportion test for each city
@@ -265,7 +271,7 @@ all_city_results %>%
 ```
 
 
-#### Visualizing Estimates and CIs for Each City
+#### Visualizing estimates and CIs for each city
 
 ```{r fig.height=10, fig.width=8}
 all_city_results %>%
