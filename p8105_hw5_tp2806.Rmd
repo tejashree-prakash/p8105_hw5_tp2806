@@ -97,14 +97,14 @@ ttest_simulation <- function(mu, n = 30, sigma = 5) { #fixing n and sigma
 ttest_results <- 
   expand.grid(
     mu_true = 1:6, 
-    iter = 1:1000 #iterate t test 1000 times per mu_true 
+    iter = 1:5000 #iterate t test 5000 times per mu_true 
   ) %>%
   mutate(
     sim = map(mu_true, ttest_simulation)
   ) %>%
   unnest(sim) %>%
   mutate(
-    reject = p_value < 0.05 #only want significant results 
+    reject = p_value < 0.05 #want to know when reject/not reject null  
   )
 
 ttest_results %>%
@@ -115,7 +115,7 @@ ttest_results %>%
     caption = "T-Test Simulation Results with Estimates"
   )
 ```
-This table demonstrates 3 of the 1000 simulation iterations per true mu value. Each true mu value is compared with a hypothesis testing population estimate of mu, its p-value, and whether the null hypothesis was rejected or not (indicating significance). 
+This table demonstrates 3 of the 5000 simulation iterations per true mu value. Each true mu value is compared with a hypothesis testing population estimate of mu, its p-value, and whether the null hypothesis was rejected or not (indicating significance). 
 
 
 #### Visualizing Power and Estimated Mu vs True Mu 
@@ -132,7 +132,7 @@ power %>%
   geom_point() + 
   geom_line() + 
   labs(
-    x="True Mean Value",
+    x="True Mu",
     y="Power",
     title = "Power of One-Sample T Test Compared to True Mean"
   )
@@ -175,4 +175,123 @@ ggplot(mean_results, aes(x = mu_true)) +
 ```
 <br> This plot demonstrates how the true mean value (true mu) relates to the average estimated mean value obtained across the simulation, comparing all samples to only those with the null hypothesis rejected. Overall, the average mean value equals the true mean value across all samples. However, they were not equal among the rejected null samples when the mean values were lower in magnitude. This demonstrates a form of bias where the estimated and true mean values only equal one another when the means are relatively greater in magnitude. 
 
+
+
+# Problem 3: Prop.Test  
+
+#### Downloading and seeing raw data
+
+```{r}
+#Load data
+homicide_df <- read_csv("data/homicide-data.csv")
+
+#Add city_state variable 
+homicide_df <- homicide_df %>%
+  mutate(city_state = str_c(city, ", ", state)) 
+
+knitr::kable(head(homicide_df, 5))
+```
+
+This dataset contains information on homicides in 50 large U.S. cities, as shown in the city_state variable. Each row is a single homicide case. 
+
+<br> Key variables include: 
+* uid - homicide case identification 
+* reported_date - date the case was initially reported
+* victim_last; victim_first; victim_race; victim_age; victim_sex describe the demographic information about the victim of the homicide case
+* disposition - states the case status (closed without arrest, closed by arrest, open/no arrest)
+
+
+#### Summarizing total number of homicides and unsolved homicdies by city
+
+```{r}
+homicide_summary <- 
+  homicide_df %>%
+  group_by(city_state) %>%
+  summarise(
+    total_homicides = n(), 
+    unsolved_homicides = sum(disposition %in% c("Closed without arrest", "Open/No arrest")) #sum the two unsolved categories together
+  ) %>%
+  arrange(desc(total_homicides))
+
+knitr::kable(head(homicide_summary, 15))
+```
+As seen in this table, Chicago has the greatest number of total homicides and unsolved homicides. Baltimore has the next greatest number of total unsolved homicides, although it is only the fourth highest total homicide count. 
+
+
+#### Prop.Test for Baltimore
+
+```{r}
+baltimore <- homicide_summary %>%
+  filter(city_state == "Baltimore, MD")
+
+#Run proportion test 
+baltimore_test <-
+  prop.test(
+  x = baltimore$unsolved_homicides,
+  n = baltimore$total_homicides
+)
+
+#Tidy df
+baltimore_test=
+  baltimore_test %>% 
+  broom::tidy() %>%
+  select(estimate, conf.low, conf.high, p.value) %>%
+  knitr::kable(
+    caption = "Proportion and Confidence Intervals of Unsolved Homicides in Baltimore, MD",
+    digits = 4
+  )
+```
+
+#### Prop.Test for All Cities
+
+```{r}
+#Run proportion test for each city
+all_city_results <- 
+  homicide_summary %>%
+  mutate(
+    prop = map2(unsolved_homicides, total_homicides,
+                ~prop.test(.x, .y)),
+    prop_tidy = map(prop, broom::tidy) #Clean 
+  ) %>%
+  unnest(prop_tidy) %>%
+  select(city_state, total_homicides, unsolved_homicides, estimate, conf.low, conf.high)
+
+all_city_results %>%
+  arrange(desc(estimate)) %>%
+  knitr::kable(
+    digits = 4,
+    caption = "Proportion of Unsolved Homicides for All Cities"
+  )
+```
+
+
+#### Visualizing Estimates and CIs for Each City
+
+```{r fig.height=10, fig.width=8}
+all_city_results %>%
+  arrange(desc(unsolved_homicides)) %>%
+  ggplot(aes(
+    x = reorder(city_state, unsolved_homicides), #order from low to high proportion of homicides 
+    y = estimate, 
+    color = city_state
+  )) + 
+  geom_point(show.legend = FALSE) + #don't want crowded X axis
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), show.legend = FALSE) + 
+  labs(
+    x = "City",
+    y = "Unsolved Homicides Proportion", 
+    title = "Proportion of Unsolved Homicides by City, alpha = 0.05"
+  ) +
+  coord_flip() + 
+  theme_minimal() + 
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 15),
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 10),
+    axis.title.x = element_text(size = 15),
+    axis.title.y = element_text(size = 15)
+  )
+```
+
+This figure shows the estimated proportion of unsolved homicides to total homicides in 51 major US cities. Chicago, New Orleans, and Baltimore have the greatest proportion of unsolved homicides compared to the other cities. Tampa and Tulsa have the lowest proportion. However, Tulsa has a proportion of 0 with a very large error, indicating that the data reported for this city may not be accurate. 
 
